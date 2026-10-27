@@ -1,0 +1,43 @@
+name: spotify-demo
+services:
+  db:
+    image: mysql:8.0.44
+    environment:
+      MYSQL_ROOT_PASSWORD: LocalRootDemo@1313
+      MYSQL_DATABASE: spotify_int1313
+    volumes:
+      - spotify_data:/var/lib/mysql
+      - ./database/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./database/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+      - ./database/04_views_indexes_procedures.sql:/docker-entrypoint-initdb.d/04_views_indexes_procedures.sql:ro
+      - ./database/99_app_user.sql:/docker-entrypoint-initdb.d/99_app_user.sql:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mysql --protocol=TCP -h127.0.0.1 -uroot -p"$$MYSQL_ROOT_PASSWORD"
+          -Nse 'SELECT COUNT(*) FROM spotify_int1313.BaiHat' >/dev/null 2>&1
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+  app:
+    build: .
+    environment:
+      DB_URL: jdbc:mysql://db:3306/spotify_int1313?connectionTimeZone=Asia/Ho_Chi_Minh&characterEncoding=UTF-8
+      DB_USER: spotify_demo
+      DB_PASSWORD: DemoDb@1313
+      APP_ALLOWED_ORIGINS: ${APP_ALLOWED_ORIGINS:-http://localhost:15173,http://127.0.0.1:15173,http://localhost:18080,http://127.0.0.1:18080}
+    ports:
+      - "127.0.0.1:${APP_PORT:-15173}:8080"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  spotify_data:

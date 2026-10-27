@@ -1,0 +1,2 @@
+CREATE USER IF NOT EXISTS 'spotify_demo'@'%' IDENTIFIED BY 'DemoDb@1313';
+GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON spotify_int1313.* TO 'spotify_demo'@'%';

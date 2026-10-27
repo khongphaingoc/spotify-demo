@@ -1,0 +1,118 @@
+-- MySQL 8.0.16+; chạy trên database mới, không tự xóa database đang có.
+CREATE DATABASE IF NOT EXISTS spotify_int1313 CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+USE spotify_int1313;
+CREATE TABLE NguoiDung (
+ MaNguoiDung BIGINT PRIMARY KEY AUTO_INCREMENT,
+ HoTen VARCHAR(120) NOT NULL,
+ Email VARCHAR(190) NOT NULL UNIQUE,
+ NgayDangKy DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ MatKhauHash VARCHAR(100) NOT NULL COMMENT 'BỔ SUNG KỸ THUẬT: bcrypt',
+ VaiTro VARCHAR(10) NOT NULL DEFAULT 'USER',
+ CONSTRAINT ck_role CHECK(VaiTro IN ('USER','ADMIN'))
+) ENGINE=InnoDB;
+CREATE TABLE NgheSi (
+ MaNgheSi BIGINT PRIMARY KEY AUTO_INCREMENT,
+ TenNgheSi VARCHAR(150) NOT NULL,
+ QuocGia VARCHAR(80) NOT NULL
+) ENGINE=InnoDB;
+CREATE TABLE Album (
+ MaAlbum BIGINT PRIMARY KEY AUTO_INCREMENT,
+ TenAlbum VARCHAR(180) NOT NULL,
+ NgayPhatHanh DATE NOT NULL,
+ MaNgheSi BIGINT NOT NULL,
+ INDEX ix_album_artist(MaNgheSi),
+ FOREIGN KEY(MaNgheSi) REFERENCES NgheSi(MaNgheSi)
+) ENGINE=InnoDB;
+CREATE TABLE TheLoai (
+ MaTheLoai BIGINT PRIMARY KEY AUTO_INCREMENT,
+ TenTheLoai VARCHAR(80) NOT NULL
+) ENGINE=InnoDB;
+CREATE TABLE BaiHat (
+ MaBaiHat BIGINT PRIMARY KEY AUTO_INCREMENT,
+ TenBaiHat VARCHAR(180) NOT NULL,
+ ThoiLuong INT NOT NULL,
+ LuotNghe BIGINT NOT NULL DEFAULT 0,
+ MaAlbum BIGINT NOT NULL,
+ MaTheLoai BIGINT NOT NULL,
+ DuongDanAudio VARCHAR(255) NOT NULL DEFAULT '/audio/demo-1.wav' COMMENT 'BỔ SUNG KỸ THUẬT',
+ INDEX ix_song_album(MaAlbum), INDEX ix_song_genre(MaTheLoai),
+ CONSTRAINT ck_duration CHECK(ThoiLuong>0),
+ CONSTRAINT ck_plays CHECK(LuotNghe>=0),
+ FOREIGN KEY(MaAlbum) REFERENCES Album(MaAlbum),
+ FOREIGN KEY(MaTheLoai) REFERENCES TheLoai(MaTheLoai)
+) ENGINE=InnoDB;
+CREATE TABLE Playlist (
+ MaPlaylist BIGINT PRIMARY KEY AUTO_INCREMENT,
+ TenPlaylist VARCHAR(150) NOT NULL,
+ NgayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ MaNguoiDung BIGINT NOT NULL,
+ INDEX ix_playlist_user(MaNguoiDung),
+ FOREIGN KEY(MaNguoiDung) REFERENCES NguoiDung(MaNguoiDung)
+) ENGINE=InnoDB;
+CREATE TABLE ChiTietPlaylist (
+ MaChiTietPlaylist BIGINT PRIMARY KEY AUTO_INCREMENT,
+ ViTri INT NOT NULL,
+ NgayThem DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ MaPlaylist BIGINT NOT NULL,
+ MaBaiHat BIGINT NOT NULL,
+ UNIQUE uq_playlist_song(MaPlaylist,MaBaiHat),
+ UNIQUE uq_playlist_position(MaPlaylist,ViTri),
+ INDEX ix_detail_song(MaBaiHat),
+ CONSTRAINT ck_position CHECK(ViTri>0),
+ FOREIGN KEY(MaPlaylist) REFERENCES Playlist(MaPlaylist) ON DELETE CASCADE,
+ FOREIGN KEY(MaBaiHat) REFERENCES BaiHat(MaBaiHat)
+) ENGINE=InnoDB;
+CREATE TABLE BaiHatYeuThich (
+ MaYeuThich BIGINT PRIMARY KEY AUTO_INCREMENT,
+ NgayYeuThich DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ MaNguoiDung BIGINT NOT NULL,
+ MaBaiHat BIGINT NOT NULL,
+ UNIQUE uq_favorite(MaNguoiDung,MaBaiHat),
+ INDEX ix_favorite_song(MaBaiHat),
+ FOREIGN KEY(MaNguoiDung) REFERENCES NguoiDung(MaNguoiDung),
+ FOREIGN KEY(MaBaiHat) REFERENCES BaiHat(MaBaiHat)
+) ENGINE=InnoDB;
+CREATE TABLE TheoDoiNgheSi (
+ MaTheoDoi BIGINT PRIMARY KEY AUTO_INCREMENT,
+ NgayTheoDoi DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ MaNguoiDung BIGINT NOT NULL,
+ MaNgheSi BIGINT NOT NULL,
+ UNIQUE uq_follow(MaNguoiDung,MaNgheSi),
+ INDEX ix_follow_artist(MaNgheSi),
+ FOREIGN KEY(MaNguoiDung) REFERENCES NguoiDung(MaNguoiDung),
+ FOREIGN KEY(MaNgheSi) REFERENCES NgheSi(MaNgheSi)
+) ENGINE=InnoDB;
+CREATE TABLE LichSuNghe (
+ MaLichSuNghe BIGINT PRIMARY KEY AUTO_INCREMENT,
+ ThoiDiemNghe DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ ThoiLuongDaNghe INT NOT NULL,
+ MaNguoiDung BIGINT NOT NULL,
+ MaBaiHat BIGINT NOT NULL,
+ INDEX ix_history_song(MaBaiHat),
+ INDEX ix_history_user(MaNguoiDung),
+ CONSTRAINT ck_listen_duration CHECK(ThoiLuongDaNghe>=0),
+ FOREIGN KEY(MaNguoiDung) REFERENCES NguoiDung(MaNguoiDung),
+ FOREIGN KEY(MaBaiHat) REFERENCES BaiHat(MaBaiHat)
+) ENGINE=InnoDB;
+-- Mỗi bản ghi nghe hợp lệ là một lượt. Trigger là nơi DUY NHẤT tăng/giảm.
+DELIMITER $$
+CREATE TRIGGER trg_history_validate BEFORE INSERT ON LichSuNghe FOR EACH ROW
+BEGIN
+ IF NEW.ThoiLuongDaNghe>(SELECT ThoiLuong FROM BaiHat WHERE MaBaiHat=NEW.MaBaiHat)
+ OR NEW.ThoiDiemNghe>CURRENT_TIMESTAMP THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Thoi luong hoac thoi diem nghe khong hop le';
+ END IF;
+END$$
+CREATE TRIGGER trg_history_insert AFTER INSERT ON LichSuNghe FOR EACH ROW
+BEGIN
+ UPDATE BaiHat SET LuotNghe=LuotNghe+1 WHERE MaBaiHat=NEW.MaBaiHat;
+END$$
+CREATE TRIGGER trg_history_delete AFTER DELETE ON LichSuNghe FOR EACH ROW
+BEGIN
+ UPDATE BaiHat SET LuotNghe=LuotNghe-1 WHERE MaBaiHat=OLD.MaBaiHat;
+END$$
+CREATE TRIGGER trg_history_immutable BEFORE UPDATE ON LichSuNghe FOR EACH ROW
+BEGIN
+ SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Lich su nghe la ban ghi bat bien';
+END$$
+DELIMITER ;
