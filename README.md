@@ -67,3 +67,17 @@ Không đưa mật khẩu DB thật, thư mục dữ liệu MySQL hoặc file .e
 - database/04_views_indexes_procedures.sql: view, chỉ mục và stored procedure.
 
 GitHub Pages: https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages
+
+## Triển khai bằng gói miễn phí
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/khongphaingoc/spotify-demo)
+
+1. Đăng ký/đăng nhập Aiven tại https://console.aiven.io/ và tạo dịch vụ **MySQL – Free**. Chỉ chọn gói Free; không cần mua VPS. Chờ MySQL sẵn sàng.
+2. Dùng thông tin kết nối của dịch vụ để import `01_schema.sql`, `02_seed.sql`, `04_views_indexes_procedures.sql` theo đúng thứ tự vào schema mới. Không dùng tài khoản/mật khẩu của MySQL cục bộ cho MySQL trên Aiven.
+3. Đăng ký/đăng nhập Render tại https://dashboard.render.com/. Bấm nút Deploy to Render ở trên. File render.yaml đã đặt gói web **Free** và build bằng Docker.
+4. Điền DB_URL (JDBC URL theo thông tin kết nối MySQL của bạn, dùng kết nối TLS theo hướng dẫn Aiven), DB_USER và DB_PASSWORD trong cấu hình Render. Không đưa các giá trị riêng này vào mã nguồn hay commit.
+5. Triển khai và chờ build. Render cấp URL HTTPS thực tế sau khi tạo dịch vụ; dùng URL đó gửi giảng viên. Ứng dụng tự nhận RENDER_EXTERNAL_URL để cho phép yêu cầu đăng nhập/đăng ký từ chính website này.
+
+Render Free có thể ngủ sau 15 phút không có truy cập và cần khoảng một phút để khởi động lại khi mở. Dữ liệu nằm ở MySQL Aiven, không nằm trên ổ đĩa tạm của Render. Bản này chưa được triển khai online chỉ bằng việc thêm cấu hình; cần hoàn tất tài khoản và kết nối DB trước.
+
+Nguồn: https://render.com/docs/free ; https://render.com/docs/blueprint-spec ; https://aiven.io/docs/products/mysql/concepts/mysql-free-tier .
